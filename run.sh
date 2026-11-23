@@ -4,7 +4,13 @@ set -euo pipefail
 SHARE="${1:?usage: bash run.sh SHARE}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 if pgrep -f "$HERE/scripts/(gen_binaries|make_wolf_trajectories).py" >/dev/null 2>&1; then echo "already running; nothing to start."; exit 0; fi
-WORKERS="${WORKERS:-$(( $(getconf _NPROCESSORS_ONLN) > 2 ? $(getconf _NPROCESSORS_ONLN) - 2 : 1 ))}"
+CORES=$(getconf _NPROCESSORS_ONLN)
+if [ -r /proc/meminfo ]; then FREE_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+else FREE_MB=$(( $(sysctl -n hw.memsize) / 1048576 / 2 )); fi   # macOS: half the RAM
+BY_MEM=$(( FREE_MB / 600 ))   # about 0.6 GB per worker
+WORKERS="${WORKERS:-$(( CORES - 2 < BY_MEM ? CORES - 2 : BY_MEM ))}"
+[ "$WORKERS" -ge 2 ] || WORKERS=2
+echo "workers: $WORKERS"
 [ -d "$HERE/exebench-share-$SHARE" ] || { echo "no exebench-share-$SHARE here"; exit 1; }
 rm -rf "$HERE/exebench"; ln -s "$HERE/exebench-share-$SHARE" "$HERE/exebench"
 case "$(uname -s)-$(uname -m)" in
@@ -39,7 +45,7 @@ fi
 "$PY" -m pip install --quiet --disable-pip-version-check $PIPX lief capstone transformers jinja2
 mkdir -p "$HERE/out" "$HERE/bins"
 HALF=$(( WORKERS / 2 > 0 ? WORKERS / 2 : 1 ))
-nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" < /dev/null &
+nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 --all-files > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" < /dev/null &
 nohup nice -n 10 "$PY" -u "$HERE/scripts/make_wolf_trajectories.py" --bins "$HERE/bins" --out "$HERE/out/tools-share$SHARE.jsonl" --count 110000 --per-program 10 --workers $HALF --seed $((100 + SHARE)) > "$HERE/out/tools.log" 2> "$HERE/out/tools.err" < /dev/null &
 sleep 15
 if pgrep -f "$HERE/scripts/make_wolf_trajectories.py" >/dev/null && pgrep -f "$HERE/scripts/gen_binaries.py" >/dev/null; then

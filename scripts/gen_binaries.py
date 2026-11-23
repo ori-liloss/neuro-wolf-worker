@@ -147,9 +147,12 @@ def main():
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2))
+    ap.add_argument("--all-files", action="store_true", help="the exebench folder already holds only this share (worker pack)")
     a = ap.parse_args()
     rng = random.Random(500 + a.shard)
-    files = sorted(EXEBENCH.glob("*.jsonl.zst"))[a.shard::a.shards]
+    files = sorted(EXEBENCH.glob("*.jsonl.zst"))
+    if not a.all_files:
+        files = files[a.shard::a.shards]
     rng.shuffle(files)
     out, held = Path(a.out), Path(a.out + "-heldout")
     made, pid = 0, a.shard * 10_000_000

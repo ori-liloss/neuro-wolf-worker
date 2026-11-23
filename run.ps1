@@ -1,5 +1,5 @@
 # Neuro-Wolf worker (Windows). Usage: powershell -ExecutionPolicy Bypass -File .\run.ps1 -Share 1
-param([Parameter(Mandatory)][int]$Share, [int]$Workers = [Math]::Max(1, [Environment]::ProcessorCount - 2))
+param([Parameter(Mandatory)][int]$Share, [int]$Workers = 0)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\gen_binaries.py*" -or $_.CommandLine -like "*$here\scripts\make_wolf_trajectories.py*" }
@@ -25,16 +25,20 @@ if ($LASTEXITCODE -ne 0) { throw "pip install failed (exit $LASTEXITCODE)" }
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $here 'bins') | Out-Null  # the trajectory maker watches it from the start
+if ($Workers -le 0) {
+    # Each worker (python + zig, or python + tokenizer) needs about 0.6 GB: never more than the free memory allows.
+    $freeGb = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+    $Workers = [Math]::Max(2, [Math]::Min([Environment]::ProcessorCount - 2, [int][Math]::Floor($freeGb / 0.6)))
+}
+"workers: $Workers"
 $half = [Math]::Max(1, [int]($Workers / 2))
 $seed = 100 + $Share
-$bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4"
+$bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4 --all-files"
 $tArgs = "-u `"$here\scripts\make_wolf_trajectories.py`" --bins `"$here\bins`" --out `"$here\out\tools-share$Share.jsonl`" --count 110000 --per-program 10 --workers $half --seed $seed"
 $py = (& python -c "import sys; print(sys.executable)").Trim()
 # Start-Process without -Redirect* goes through ShellExecute: hidden, detached, no inherited handles (with
 # redirection the workers would inherit the caller's output pipe and whoever started this would wait forever).
-# cmd does the redirection. Children of a below-normal process start below normal, so lower this one meanwhile.
-# (Not Win32_Process.Create: WMI puts its processes under a memory quota and the program builder hits MemoryError.)
-function Start-Worker([string]$argLine, [string]$name) {
+# cmd does the redirection. Children of a below-normal process start below normal, so lower this one meanwhile.function Start-Worker([string]$argLine, [string]$name) {
     $cmdArgs = "/d /c `"`"$py`" $argLine > `"$here\out\$name.log`" 2> `"$here\out\$name.err`"`""
     Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $here -WindowStyle Hidden
 }
