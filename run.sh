@@ -22,10 +22,28 @@ if [ ! -x "$HERE/zig/$Z/zig" ]; then
   tar -xJf "$HERE/zig/$Z.tar.xz" -C "$HERE/zig" && rm "$HERE/zig/$Z.tar.xz"
 fi
 export ZIG="$HERE/zig/$Z/zig" PYTHONUTF8=1
-PY="${PYTHON:-python3}"
-"$PY" -m pip install --quiet --user lief capstone transformers jinja2 || "$PY" -m pip install --quiet --break-system-packages lief capstone transformers jinja2
+# Python packages go into this folder's own venv (works where the system Python has no pip, e.g. SteamOS,
+# or refuses system-wide installs, e.g. Homebrew / Debian).
+PY0="${PYTHON:-python3}"
+VENV="$HERE/.venv"
+if [ ! -x "$VENV/bin/python" ]; then
+  "$PY0" -m venv "$VENV" >/dev/null 2>&1 || { rm -rf "$VENV"; "$PY0" -m venv --without-pip "$VENV" || rm -rf "$VENV"; }
+fi
+if [ -x "$VENV/bin/python" ]; then PY="$VENV/bin/python"; PIPX=""; else PY="$PY0"; PIPX="--user --break-system-packages"; fi
+if ! "$PY" -m pip --version >/dev/null 2>&1; then
+  echo "installing pip (bootstrap.pypa.io)"
+  curl -fsSL -o "$HERE/get-pip.py" https://bootstrap.pypa.io/get-pip.py
+  "$PY" "$HERE/get-pip.py" --quiet $PIPX
+  rm -f "$HERE/get-pip.py"
+fi
+"$PY" -m pip install --quiet $PIPX lief capstone transformers jinja2
 mkdir -p "$HERE/out"
 HALF=$(( WORKERS / 2 > 0 ? WORKERS / 2 : 1 ))
 nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" &
 nohup nice -n 10 "$PY" -u "$HERE/scripts/make_wolf_trajectories.py" --bins "$HERE/bins" --out "$HERE/out/tools-share$SHARE.jsonl" --count 110000 --per-program 10 --workers $HALF --seed $((100 + SHARE)) > "$HERE/out/tools.log" 2> "$HERE/out/tools.err" &
-echo "running. Progress: tail -f $HERE/out/tools.log. Copy out/tools-share$SHARE.jsonl back when it stops growing."
+sleep 15
+if pgrep -f "$HERE/scripts/make_wolf_trajectories.py" >/dev/null && pgrep -f "$HERE/scripts/gen_binaries.py" >/dev/null; then
+  echo "RUNNING. Progress: tail -f $HERE/out/tools.log. Copy out/tools-share$SHARE.jsonl back when it stops growing."
+else
+  echo "FAILED to start. Last errors:"; tail -n 15 "$HERE/out/bins.err" "$HERE/out/tools.err" 2>/dev/null; exit 1
+fi

@@ -59,4 +59,4 @@ EOF
   fi
   bash "$DIR/start.sh" "$SHARE"
 fi
-echo "done. Share $SHARE runs now and after every restart. Progress: tail -f $DIR/out/tools.log"
+echo "installed: share $SHARE starts after every restart (git pull first). Status of this start is above (RUNNING or FAILED); full log: $DIR/out/start.log"

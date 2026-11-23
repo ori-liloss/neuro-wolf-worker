@@ -18,4 +18,4 @@ $cmd = Join-Path $startup 'neuro-wolf-worker.cmd'
 Set-Content -Path $cmd -Encoding ascii -Value "@start `"`" /min powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$dir\start.ps1`" -Share $Share"
 "autostart at logon: $cmd"
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir 'start.ps1') -Share $Share
-"done. Share $Share runs now and after every restart. Progress: $dir\out\tools.log"
+"installed: share $Share starts at every logon (git pull first). Status of this start is above (RUNNING or FAILED); full log: $dir\out\start.log"

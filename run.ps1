@@ -4,10 +4,10 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\gen_binaries.py*" -or $_.CommandLine -like "*$here\scripts\make_wolf_trajectories.py*" }
 if ($running) { "already running (pid $(@($running.ProcessId) -join ', ')); nothing to start."; exit 0 }
-$share = Join-Path $here "exebench-share-$Share"
-if (-not (Test-Path $share)) { throw "no exebench-share-$Share in this folder" }
+$shareDir = Join-Path $here "exebench-share-$Share"
+if (-not (Test-Path $shareDir)) { throw "no exebench-share-$Share in this folder" }
 if (Test-Path (Join-Path $here 'exebench')) { Remove-Item (Join-Path $here 'exebench') -Recurse -Force }
-New-Item -ItemType Junction -Path (Join-Path $here 'exebench') -Target $share | Out-Null
+New-Item -ItemType Junction -Path (Join-Path $here 'exebench') -Target $shareDir | Out-Null
 $zig = Join-Path $here 'zig\zig-windows-x86_64-0.13.0\zig.exe'
 if (-not (Test-Path $zig)) {
     "downloading Zig 0.13.0 (75 MB, ziglang.org)"
@@ -17,10 +17,19 @@ if (-not (Test-Path $zig)) {
     Expand-Archive $zip (Join-Path $here 'zig') -Force; Remove-Item $zip
 }
 $env:ZIG = $zig; $env:PYTHONUTF8 = '1'
-python -m pip install --quiet lief capstone transformers jinja2
+$ErrorActionPreference = 'Continue'  # native stderr must not stop the script here (PowerShell 5.1)
+python -m pip --version *> $null
+if ($LASTEXITCODE -ne 0) { "installing pip"; python -m ensurepip --user *> $null }
+$ErrorActionPreference = 'Stop'
+python -m pip install --quiet --user lief capstone transformers jinja2
+if ($LASTEXITCODE -ne 0) { throw "pip install failed (exit $LASTEXITCODE)" }
 New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
 $b = Start-Process python -ArgumentList '-u', "$here\scripts\gen_binaries.py", '--out', "$here\bins", '--count', '15000', '--workers', [Math]::Max(1, [int]($Workers / 2)), '--shard', $Share, '--shards', '4' -RedirectStandardOutput "$here\out\bins.log" -RedirectStandardError "$here\out\bins.err" -WindowStyle Hidden -PassThru
 $b.PriorityClass = 'BelowNormal'
 $t = Start-Process python -ArgumentList '-u', "$here\scripts\make_wolf_trajectories.py", '--bins', "$here\bins", '--out', "$here\out\tools-share$Share.jsonl", '--count', '110000', '--per-program', '10', '--workers', [Math]::Max(1, [int]($Workers / 2)), '--seed', (100 + $Share) -RedirectStandardOutput "$here\out\tools.log" -RedirectStandardError "$here\out\tools.err" -WindowStyle Hidden -PassThru
 $t.PriorityClass = 'BelowNormal'
-"running: programs (pid $($b.Id)) and trajectories (pid $($t.Id)). Progress: out\tools.log. Copy out\tools-share$Share.jsonl back when it stops growing."
+Start-Sleep 15
+if ($b.HasExited -or $t.HasExited) {
+    "FAILED to start. Last errors:"; Get-Content "$here\out\bins.err", "$here\out\tools.err" -Tail 15 -ErrorAction SilentlyContinue; exit 1
+}
+"RUNNING: programs (pid $($b.Id)) and trajectories (pid $($t.Id)). Progress: out\tools.log. Copy out\tools-share$Share.jsonl back when it stops growing."

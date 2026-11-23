@@ -7,3 +7,4 @@ zigcache/
 exebench
 __pycache__/
 *.pyc
+.venv/
