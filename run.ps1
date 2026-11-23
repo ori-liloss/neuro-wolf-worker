@@ -38,7 +38,8 @@ $tArgs = "-u `"$here\scripts\make_wolf_trajectories.py`" --bins `"$here\bins`" -
 $py = (& python -c "import sys; print(sys.executable)").Trim()
 # Start-Process without -Redirect* goes through ShellExecute: hidden, detached, no inherited handles (with
 # redirection the workers would inherit the caller's output pipe and whoever started this would wait forever).
-# cmd does the redirection. Children of a below-normal process start below normal, so lower this one meanwhile.function Start-Worker([string]$argLine, [string]$name) {
+# cmd does the redirection. Children of a below-normal process start below normal, so lower this one meanwhile.
+function Start-Worker([string]$argLine, [string]$name) {
     $cmdArgs = "/d /c `"`"$py`" $argLine > `"$here\out\$name.log`" 2> `"$here\out\$name.err`"`""
     Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $here -WindowStyle Hidden
 }
