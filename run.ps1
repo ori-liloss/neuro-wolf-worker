@@ -20,13 +20,17 @@ $env:ZIG = $zig; $env:PYTHONUTF8 = '1'
 $ErrorActionPreference = 'Continue'  # native stderr must not stop the script here (PowerShell 5.1)
 python -m pip --version *> $null
 if ($LASTEXITCODE -ne 0) { "installing pip"; python -m ensurepip --user *> $null }
-$ErrorActionPreference = 'Stop'
-python -m pip install --quiet --user lief capstone transformers jinja2
+python -m pip install --quiet --disable-pip-version-check --user lief capstone transformers jinja2
 if ($LASTEXITCODE -ne 0) { throw "pip install failed (exit $LASTEXITCODE)" }
+$ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
-$b = Start-Process python -ArgumentList '-u', "$here\scripts\gen_binaries.py", '--out', "$here\bins", '--count', '15000', '--workers', [Math]::Max(1, [int]($Workers / 2)), '--shard', $Share, '--shards', '4' -RedirectStandardOutput "$here\out\bins.log" -RedirectStandardError "$here\out\bins.err" -WindowStyle Hidden -PassThru
+$half = [Math]::Max(1, [int]($Workers / 2))
+$seed = 100 + $Share
+$bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4"
+$tArgs = "-u `"$here\scripts\make_wolf_trajectories.py`" --bins `"$here\bins`" --out `"$here\out\tools-share$Share.jsonl`" --count 110000 --per-program 10 --workers $half --seed $seed"
+$b = Start-Process python -ArgumentList $bArgs -RedirectStandardOutput "$here\out\bins.log" -RedirectStandardError "$here\out\bins.err" -WindowStyle Hidden -PassThru
 $b.PriorityClass = 'BelowNormal'
-$t = Start-Process python -ArgumentList '-u', "$here\scripts\make_wolf_trajectories.py", '--bins', "$here\bins", '--out', "$here\out\tools-share$Share.jsonl", '--count', '110000', '--per-program', '10', '--workers', [Math]::Max(1, [int]($Workers / 2)), '--seed', (100 + $Share) -RedirectStandardOutput "$here\out\tools.log" -RedirectStandardError "$here\out\tools.err" -WindowStyle Hidden -PassThru
+$t = Start-Process python -ArgumentList $tArgs -RedirectStandardOutput "$here\out\tools.log" -RedirectStandardError "$here\out\tools.err" -WindowStyle Hidden -PassThru
 $t.PriorityClass = 'BelowNormal'
 Start-Sleep 15
 if ($b.HasExited -or $t.HasExited) {

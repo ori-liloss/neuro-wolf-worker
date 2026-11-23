@@ -36,7 +36,7 @@ if ! "$PY" -m pip --version >/dev/null 2>&1; then
   "$PY" "$HERE/get-pip.py" --quiet $PIPX
   rm -f "$HERE/get-pip.py"
 fi
-"$PY" -m pip install --quiet $PIPX lief capstone transformers jinja2
+"$PY" -m pip install --quiet --disable-pip-version-check $PIPX lief capstone transformers jinja2
 mkdir -p "$HERE/out"
 HALF=$(( WORKERS / 2 > 0 ? WORKERS / 2 : 1 ))
 nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" &
