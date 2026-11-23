@@ -16,7 +16,7 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[1]
-DEFAULT = "http://192.168.7.14:8790"
+DEFAULT = "http://192.168.7.14:8795"
 CHUNK = 32 * 1024 * 1024
 
 
