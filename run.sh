@@ -3,6 +3,7 @@
 set -euo pipefail
 SHARE="${1:?usage: bash run.sh SHARE}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+if pgrep -f "$HERE/scripts/(gen_binaries|make_wolf_trajectories).py" >/dev/null 2>&1; then echo "already running; nothing to start."; exit 0; fi
 WORKERS="${WORKERS:-$(( $(getconf _NPROCESSORS_ONLN) > 2 ? $(getconf _NPROCESSORS_ONLN) - 2 : 1 ))}"
 [ -d "$HERE/exebench-share-$SHARE" ] || { echo "no exebench-share-$SHARE here"; exit 1; }
 rm -rf "$HERE/exebench"; ln -s "$HERE/exebench-share-$SHARE" "$HERE/exebench"

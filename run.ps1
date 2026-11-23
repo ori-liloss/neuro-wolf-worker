@@ -2,6 +2,8 @@
 param([Parameter(Mandatory)][int]$Share, [int]$Workers = [Math]::Max(1, [Environment]::ProcessorCount - 2))
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
+$running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\gen_binaries.py*" -or $_.CommandLine -like "*$here\scripts\make_wolf_trajectories.py*" }
+if ($running) { "already running (pid $(@($running.ProcessId) -join ', ')); nothing to start."; exit 0 }
 $share = Join-Path $here "exebench-share-$Share"
 if (-not (Test-Path $share)) { throw "no exebench-share-$Share in this folder" }
 if (Test-Path (Join-Path $here 'exebench')) { Remove-Item (Join-Path $here 'exebench') -Recurse -Force }

@@ -8,17 +8,19 @@
 - maor (Linux): חלק 2
 - Mac mini: חלק 3
 
-## הפעלה
-1. להוריד את המאגר (פעם אחת, המאגר ציבורי ולא צריך להתחבר):
-   `git clone https://github.com/ori-liloss/neuro-wolf-worker.git`
-   ואחר כך, כדי לקבל עדכונים: `git pull` בתוך התיקייה.
-2. צריך Python 3 שמותקן במחשב (כבר יש בשלושתם, ה-mesh משתמש בו).
-3. להריץ בתוך התיקייה `neuro-wolf-worker`:
-   - Windows: `powershell -ExecutionPolicy Bypass -File .\run.ps1 -Share 1`
-   - Linux: `bash run.sh 2`
-   - Mac: `bash run.sh 3`
+## הפעלה: פקודה אחת, פעם אחת בכל מחשב
+הפקודה מורידה את המאגר פעם אחת (לתיקייה `neuro-wolf-worker` בתיקיית הבית), מפעילה את העבודה עכשיו, וקובעת שהיא תופעל שוב לבד אחרי כל הפעלה מחדש של המחשב. בכל הפעלה היא עושה `git pull`, לא clone מחדש, ואם העבודה כבר רצה היא לא מפעילה אותה פעמיים.
 
-הסקריפט מוריד את Zig הרשמי (בודק את החתימה), מתקין את lief, capstone ו-transformers, ומפעיל שני תהליכים בעדיפות נמוכה.
+- OhProggraming (Windows, ב-PowerShell):
+  `irm https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.ps1 -OutFile $env:TEMP
+w-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP
+w-install.ps1 -Share 1`
+- maor (Linux):
+  `curl -fsSL https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.sh | bash -s 2`
+- Mac mini:
+  `curl -fsSL https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.sh | bash -s 3`
+
+צריך git ו-Python 3 במחשב. הסקריפט מוריד את Zig הרשמי (בודק את החתימה), מתקין את lief, capstone ו-transformers, ומפעיל שני תהליכים בעדיפות נמוכה.
 
 ## כשזה מסתיים
 הקובץ `out/tools-share<N>.jsonl` מפסיק לגדול (או ב-`out/tools.log` מופיע `done`). להעתיק אותו למחשב הראשי, לתיקייה
