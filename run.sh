@@ -3,7 +3,15 @@
 set -euo pipefail
 SHARE="${1:?usage: bash run.sh SHARE}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-if pgrep -f "$HERE/scripts/(gen_binaries|make_wolf_trajectories).py" >/dev/null 2>&1; then echo "already running; nothing to start."; exit 0; fi
+# The uploader sends out/tools-share<N>.jsonl to the main PC by itself (scripts/upload.py, wolf_receiver.py there).
+start_uploader() {
+  if pgrep -f "$HERE/scripts/upload.py" >/dev/null 2>&1; then echo "uploader already running"; return; fi
+  mkdir -p "$HERE/out"
+  UPY="python3"; [ -x "$HERE/.venv/bin/python" ] && UPY="$HERE/.venv/bin/python"
+  nohup "$UPY" -u "$HERE/scripts/upload.py" --file "$HERE/out/tools-share$SHARE.jsonl" >> "$HERE/out/upload.log" 2>&1 < /dev/null &
+  echo "uploader started: out/tools-share$SHARE.jsonl goes to the main PC by itself (log: out/upload.log)"
+}
+if pgrep -f "$HERE/scripts/(gen_binaries|make_wolf_trajectories).py" >/dev/null 2>&1; then echo "already running; not starting the workers again."; start_uploader; exit 0; fi
 CORES=$(getconf _NPROCESSORS_ONLN)
 if [ -r /proc/meminfo ]; then FREE_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 else FREE_MB=$(( $(sysctl -n hw.memsize) / 1048576 / 2 )); fi   # macOS: half the RAM
@@ -49,6 +57,7 @@ nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --c
 nohup nice -n 10 "$PY" -u "$HERE/scripts/make_wolf_trajectories.py" --bins "$HERE/bins" --out "$HERE/out/tools-share$SHARE.jsonl" --count 110000 --per-program 10 --workers $HALF --seed $((100 + SHARE)) > "$HERE/out/tools.log" 2> "$HERE/out/tools.err" < /dev/null &
 sleep 15
 if pgrep -f "$HERE/scripts/make_wolf_trajectories.py" >/dev/null && pgrep -f "$HERE/scripts/gen_binaries.py" >/dev/null; then
+  start_uploader
   echo "RUNNING. Progress: tail -f $HERE/out/tools.log. Copy out/tools-share$SHARE.jsonl back when it stops growing."
 else
   echo "FAILED to start. Last errors:"; tail -n 15 "$HERE/out/bins.err" "$HERE/out/tools.err" 2>/dev/null; exit 1

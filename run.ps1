@@ -3,7 +3,17 @@ param([Parameter(Mandatory)][int]$Share, [int]$Workers = 0)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\gen_binaries.py*" -or $_.CommandLine -like "*$here\scripts\make_wolf_trajectories.py*" }
-if ($running) { "already running (pid $(@($running.ProcessId) -join ', ')); nothing to start."; exit 0 }
+# The uploader sends out\tools-share<N>.jsonl to the main PC by itself (scripts\upload.py, wolf_receiver.py there).
+function Start-Uploader {
+    $up = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\upload.py*" }
+    if ($up) { "uploader already running (pid $(@($up.ProcessId)[0]))"; return }
+    New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
+    $pyexe = (& python -c "import sys; print(sys.executable)").Trim()
+    $a = "/d /c `"`"$pyexe`" -u `"$here\scripts\upload.py`" --file `"$here\out\tools-share$Share.jsonl`" >> `"$here\out\upload.log`" 2>&1`""
+    Start-Process cmd.exe -ArgumentList $a -WorkingDirectory $here -WindowStyle Hidden
+    "uploader started: out\tools-share$Share.jsonl goes to the main PC by itself (log: out\upload.log)"
+}
+if ($running) { "already running (pid $(@($running.ProcessId) -join ', ')); not starting the workers again."; Start-Uploader; exit 0 }
 $shareDir = Join-Path $here "exebench-share-$Share"
 if (-not (Test-Path $shareDir)) { throw "no exebench-share-$Share in this folder" }
 if (Test-Path (Join-Path $here 'exebench')) { Remove-Item (Join-Path $here 'exebench') -Recurse -Force }
@@ -54,4 +64,5 @@ $t = $live | Where-Object { $_.CommandLine -like '*make_wolf_trajectories.py*' }
 if (-not $b -or -not $t) {
     "FAILED to start. Last errors:"; Get-Content "$here\out\bins.err", "$here\out\tools.err" -Tail 15 -ErrorAction SilentlyContinue; exit 1
 }
+Start-Uploader
 "RUNNING: programs (pid $(@($b.ProcessId)[0])) and trajectories (pid $(@($t.ProcessId)[0])). Progress: out\tools.log. Copy out\tools-share$Share.jsonl back when it stops growing."
