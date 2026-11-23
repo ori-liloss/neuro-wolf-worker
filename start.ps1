@@ -5,4 +5,5 @@ New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
 $log = Join-Path $here 'out\start.log'
 Add-Content $log "$(Get-Date -Format s) start (share $Share)"
 try { git -C $here pull --ff-only 2>&1 | Add-Content $log } catch { Add-Content $log "git pull failed: $_ (continuing with what is here)" }
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here 'run.ps1') -Share $Share 2>&1 | Tee-Object -FilePath $log -Append
+# In this process, not a child powershell piped to Tee: an OS pipe would be inherited by the workers and never close.
+& (Join-Path $here 'run.ps1') -Share $Share | Tee-Object -FilePath $log -Append

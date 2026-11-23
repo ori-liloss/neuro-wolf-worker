@@ -37,10 +37,10 @@ if ! "$PY" -m pip --version >/dev/null 2>&1; then
   rm -f "$HERE/get-pip.py"
 fi
 "$PY" -m pip install --quiet --disable-pip-version-check $PIPX lief capstone transformers jinja2
-mkdir -p "$HERE/out"
+mkdir -p "$HERE/out" "$HERE/bins"
 HALF=$(( WORKERS / 2 > 0 ? WORKERS / 2 : 1 ))
-nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" &
-nohup nice -n 10 "$PY" -u "$HERE/scripts/make_wolf_trajectories.py" --bins "$HERE/bins" --out "$HERE/out/tools-share$SHARE.jsonl" --count 110000 --per-program 10 --workers $HALF --seed $((100 + SHARE)) > "$HERE/out/tools.log" 2> "$HERE/out/tools.err" &
+nohup nice -n 10 "$PY" -u "$HERE/scripts/gen_binaries.py" --out "$HERE/bins" --count 15000 --workers $HALF --shard "$SHARE" --shards 4 > "$HERE/out/bins.log" 2> "$HERE/out/bins.err" < /dev/null &
+nohup nice -n 10 "$PY" -u "$HERE/scripts/make_wolf_trajectories.py" --bins "$HERE/bins" --out "$HERE/out/tools-share$SHARE.jsonl" --count 110000 --per-program 10 --workers $HALF --seed $((100 + SHARE)) > "$HERE/out/tools.log" 2> "$HERE/out/tools.err" < /dev/null &
 sleep 15
 if pgrep -f "$HERE/scripts/make_wolf_trajectories.py" >/dev/null && pgrep -f "$HERE/scripts/gen_binaries.py" >/dev/null; then
   echo "RUNNING. Progress: tail -f $HERE/out/tools.log. Copy out/tools-share$SHARE.jsonl back when it stops growing."

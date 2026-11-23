@@ -24,6 +24,7 @@ python -m pip install --quiet --disable-pip-version-check --user lief capstone t
 if ($LASTEXITCODE -ne 0) { throw "pip install failed (exit $LASTEXITCODE)" }
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force (Join-Path $here 'out') | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $here 'bins') | Out-Null  # the trajectory maker watches it from the start
 $half = [Math]::Max(1, [int]($Workers / 2))
 $seed = 100 + $Share
 $bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4"
