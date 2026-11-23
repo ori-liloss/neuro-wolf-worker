@@ -1,0 +1,9 @@
+# made on each machine, never pushed
+out/
+bins/
+bins-heldout/
+zig/
+zigcache/
+exebench
+__pycache__/
+*.pyc
