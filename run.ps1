@@ -30,16 +30,18 @@ $seed = 100 + $Share
 $bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4"
 $tArgs = "-u `"$here\scripts\make_wolf_trajectories.py`" --bins `"$here\bins`" --out `"$here\out\tools-share$Share.jsonl`" --count 110000 --per-program 10 --workers $half --seed $seed"
 $py = (& python -c "import sys; print(sys.executable)").Trim()
-# Win32_Process.Create: hidden, below-normal priority, detached, and no inherited handles (Start-Process with
-# redirection hands the workers the caller's output pipe, so whoever started this would wait for them forever).
+# Start-Process without -Redirect* goes through ShellExecute: hidden, detached, no inherited handles (with
+# redirection the workers would inherit the caller's output pipe and whoever started this would wait forever).
+# cmd does the redirection. Children of a below-normal process start below normal, so lower this one meanwhile.
+# (Not Win32_Process.Create: WMI puts its processes under a memory quota and the program builder hits MemoryError.)
 function Start-Worker([string]$argLine, [string]$name) {
-    $line = "cmd.exe /d /c `"set `"ZIG=$zig`"&& set PYTHONUTF8=1&& `"$py`" $argLine > `"$here\out\$name.log`" 2> `"$here\out\$name.err`"`""
-    $si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ PriorityClass = [uint32]16384; ShowWindow = [uint16]0 }
-    $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line; CurrentDirectory = $here; ProcessStartupInformation = $si }
-    if ($r.ReturnValue -ne 0) { throw "could not start $name (Win32_Process.Create returned $($r.ReturnValue))" }
+    $cmdArgs = "/d /c `"`"$py`" $argLine > `"$here\out\$name.log`" 2> `"$here\out\$name.err`"`""
+    Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $here -WindowStyle Hidden
 }
+$me = Get-Process -Id $PID; $oldPriority = $me.PriorityClass; $me.PriorityClass = 'BelowNormal'
 Start-Worker $bArgs 'bins'
 Start-Worker $tArgs 'tools'
+$me.PriorityClass = $oldPriority
 Start-Sleep 15
 $live = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\*" }
 $b = $live | Where-Object { $_.CommandLine -like '*gen_binaries.py*' }
