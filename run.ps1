@@ -29,12 +29,22 @@ $half = [Math]::Max(1, [int]($Workers / 2))
 $seed = 100 + $Share
 $bArgs = "-u `"$here\scripts\gen_binaries.py`" --out `"$here\bins`" --count 15000 --workers $half --shard $Share --shards 4"
 $tArgs = "-u `"$here\scripts\make_wolf_trajectories.py`" --bins `"$here\bins`" --out `"$here\out\tools-share$Share.jsonl`" --count 110000 --per-program 10 --workers $half --seed $seed"
-$b = Start-Process python -ArgumentList $bArgs -RedirectStandardOutput "$here\out\bins.log" -RedirectStandardError "$here\out\bins.err" -WindowStyle Hidden -PassThru
-$b.PriorityClass = 'BelowNormal'
-$t = Start-Process python -ArgumentList $tArgs -RedirectStandardOutput "$here\out\tools.log" -RedirectStandardError "$here\out\tools.err" -WindowStyle Hidden -PassThru
-$t.PriorityClass = 'BelowNormal'
+$py = (& python -c "import sys; print(sys.executable)").Trim()
+# Win32_Process.Create: hidden, below-normal priority, detached, and no inherited handles (Start-Process with
+# redirection hands the workers the caller's output pipe, so whoever started this would wait for them forever).
+function Start-Worker([string]$argLine, [string]$name) {
+    $line = "cmd.exe /d /c `"set `"ZIG=$zig`"&& set PYTHONUTF8=1&& `"$py`" $argLine > `"$here\out\$name.log`" 2> `"$here\out\$name.err`"`""
+    $si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ PriorityClass = [uint32]16384; ShowWindow = [uint16]0 }
+    $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line; CurrentDirectory = $here; ProcessStartupInformation = $si }
+    if ($r.ReturnValue -ne 0) { throw "could not start $name (Win32_Process.Create returned $($r.ReturnValue))" }
+}
+Start-Worker $bArgs 'bins'
+Start-Worker $tArgs 'tools'
 Start-Sleep 15
-if ($b.HasExited -or $t.HasExited) {
+$live = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like "*$here\scripts\*" }
+$b = $live | Where-Object { $_.CommandLine -like '*gen_binaries.py*' }
+$t = $live | Where-Object { $_.CommandLine -like '*make_wolf_trajectories.py*' }
+if (-not $b -or -not $t) {
     "FAILED to start. Last errors:"; Get-Content "$here\out\bins.err", "$here\out\tools.err" -Tail 15 -ErrorAction SilentlyContinue; exit 1
 }
-"RUNNING: programs (pid $($b.Id)) and trajectories (pid $($t.Id)). Progress: out\tools.log. Copy out\tools-share$Share.jsonl back when it stops growing."
+"RUNNING: programs (pid $(@($b.ProcessId)[0])) and trajectories (pid $(@($t.ProcessId)[0])). Progress: out\tools.log. Copy out\tools-share$Share.jsonl back when it stops growing."
