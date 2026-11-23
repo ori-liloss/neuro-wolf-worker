@@ -12,9 +12,7 @@
 הפקודה מורידה את המאגר פעם אחת (לתיקייה `neuro-wolf-worker` בתיקיית הבית), מפעילה את העבודה עכשיו, וקובעת שהיא תופעל שוב לבד אחרי כל הפעלה מחדש של המחשב. בכל הפעלה היא עושה `git pull`, לא clone מחדש, ואם העבודה כבר רצה היא לא מפעילה אותה פעמיים.
 
 - OhProggraming (Windows, ב-PowerShell):
-  `irm https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.ps1 -OutFile $env:TEMP
-w-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP
-w-install.ps1 -Share 1`
+  `irm https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.ps1 -OutFile $env:TEMP\nw-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\nw-install.ps1 -Share 1`
 - maor (Linux):
   `curl -fsSL https://raw.githubusercontent.com/ori-liloss/neuro-wolf-worker/main/install.sh | bash -s 2`
 - Mac mini:
